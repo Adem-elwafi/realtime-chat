@@ -1,7 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\ChatController;
+use App\Http\Controllers\UserController;
 
 /*
 |--------------------------------------------------------------------------
@@ -16,20 +17,35 @@ use Illuminate\Support\Facades\Auth;
 
 // Home route - redirects based on authentication status
 Route::get('/', function () {
-    // If user is authenticated, redirect to dashboard
-    if (Auth::check()) {
-        return redirect()->route('dashboard');
+    if (auth()->check()) {
+        return redirect()->route('chat.index');
     }
-    
-    // Otherwise, redirect to login page
     return redirect()->route('login');
 })->name('home');
 
-// Dashboard route - protected by auth middleware
-// Only authenticated users can access this route
+// Dashboard route (redirect to chat)
 Route::get('/dashboard', function () {
-    return view('dashboard');
+    return redirect()->route('chat.index');
 })->middleware(['auth'])->name('dashboard');
+
+// Chat routes - all protected by auth middleware
+Route::middleware(['auth'])->group(function () {
+    // Show list of conversations
+    Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
+    
+    // Show chat with specific user
+    Route::get('/chat/{userId}', [ChatController::class, 'show'])->name('chat.show');
+    
+    // Send new message
+    Route::post('/chat/message', [ChatController::class, 'store'])->name('chat.store');
+    
+    // Mark conversation as read
+    Route::post('/chat/{conversationId}/read', [ChatController::class, 'markAsRead'])->name('chat.markAsRead');
+    
+    // User discovery routes
+    Route::get('/users', [UserController::class, 'index'])->name('users.index');
+    Route::get('/users/search', [UserController::class, 'search'])->name('users.search');
+});
 
 // Include authentication routes from Breeze
 require __DIR__.'/auth.php';
