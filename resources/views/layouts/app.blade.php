@@ -11,26 +11,26 @@
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
 
-    <!-- Tailwind CSS CDN - For initial styling until we configure local Tailwind -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Custom Tailwind configuration -->
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Figtree', 'ui-sans-serif', 'system-ui'],
-                    }
-                }
-            }
-        }
-    </script>
-
-    <!-- Styles -->
+    <!-- Tailwind CSS -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     
-    <!-- Placeholder for future JavaScript imports -->
+    <!-- Custom styles -->
+    <style>
+        .scrollbar-thin::-webkit-scrollbar {
+            width: 6px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+    
     @stack('scripts')
 </head>
 <body class="font-sans antialiased bg-gray-100">
@@ -41,10 +41,24 @@
                 <div class="flex justify-between h-16">
                     <div class="flex items-center">
                         <!-- Logo -->
-                        <a href="{{ route('dashboard') }}" class="text-xl font-bold text-gray-800">
+                        <a href="{{ route('chat.index') }}" class="text-xl font-bold text-gray-800">
                             {{ config('app.name', 'RealTime Chat') }}
                         </a>
                     </div>
+                    
+                    <!-- Navigation Links -->
+                    @auth
+                    <div class="hidden md:flex items-center space-x-6">
+                        <a href="{{ route('chat.index') }}" 
+                           class="text-gray-700 hover:text-gray-900 font-medium {{ request()->routeIs('chat.*') ? 'text-blue-600' : '' }}">
+                            Chats
+                        </a>
+                        <a href="{{ route('users.index') }}" 
+                           class="text-gray-700 hover:text-gray-900 font-medium {{ request()->routeIs('users.*') ? 'text-blue-600' : '' }}">
+                            Find Users
+                        </a>
+                    </div>
+                    @endauth
                     
                     <!-- User Navigation -->
                     <div class="flex items-center">
@@ -52,7 +66,7 @@
                             <div class="relative">
                                 <button id="user-menu-button" class="flex items-center text-sm rounded-full focus:outline-none">
                                     <span class="sr-only">Open user menu</span>
-                                    <!-- User avatar placeholder -->
+                                    <!-- User avatar -->
                                     <div class="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
                                         <span class="text-xs font-medium text-gray-700">
                                             {{ substr(Auth::user()->name, 0, 1) }}
@@ -74,6 +88,23 @@
                 </div>
             </div>
         </nav>
+
+        <!-- Flash Messages -->
+        @if(session('success'))
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+                <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+                    {{ session('success') }}
+                </div>
+            </div>
+        @endif
+        
+        @if(session('error'))
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+                    {{ session('error') }}
+                </div>
+            </div>
+        @endif
 
         <!-- Page Content -->
         <main>
