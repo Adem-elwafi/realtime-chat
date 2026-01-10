@@ -65,36 +65,25 @@ class ChatController extends Controller
      * @param int $userId The ID of the user to chat with
      * @return \Illuminate\View\View
      */
-    public function show($userId)
-    {
-        // Get the authenticated user
-        $currentUser = Auth::user();
-        
-        // Validate that we're not trying to chat with ourselves
-        if ($currentUser->id == $userId) {
-            return redirect()->route('chat.index')->with('error', 'You cannot chat with yourself.');
-        }
-        
-        // Find or create conversation with the specified user
-        $conversation = $currentUser->getConversationWith($userId);
-        
-        // Get the other user
-        $otherUser = $conversation->getOtherUser($currentUser->id);
-        
-        // Load all messages in this conversation
-        $messages = $conversation->messages()->with('sender')->get();
-        
-        // Mark all messages from the other user as read
-        Message::where('conversation_id', $conversation->id)
-            ->where('sender_id', '!=', $currentUser->id)
-            ->where('is_read', false)
-            ->update([
-                'is_read' => true,
-                'read_at' => now()
-            ]);
-        
-        return view('chat.show', compact('conversation', 'otherUser', 'messages'));
-    }
+public function show($userId)
+{
+    $user = Auth::user();
+    $otherUser = User::findOrFail($userId);
+    $conversation = $user->getConversationWith($otherUser->id);
+
+    // Prepare messages in format expected by React
+    $messagesForReact = $conversation->messages->map(function ($msg) {
+        return [
+            'id' => $msg->id,
+            'body' => $msg->message, // ← your DB column is 'message'
+            'sender_id' => $msg->sender_id,
+            'sender_name' => optional($msg->sender)->name ?? 'Unknown',
+            'created_at' => $msg->created_at->toIso8601String(),
+        ];
+    })->values();
+
+    return view('chat.show', compact('conversation', 'otherUser', 'messagesForReact'));
+}
 
     /**
      * Store a new message in a conversation.
