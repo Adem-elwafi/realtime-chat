@@ -9,6 +9,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use App\Http\Requests\StoreMessageRequest;
+use App\Events\MessageSent;
+use Illuminate\Http\JsonResponse;
 
 class ChatController extends Controller
 {
@@ -104,40 +106,48 @@ class ChatController extends Controller
      * @param StoreMessageRequest $request The validated request
      * @return \Illuminate\Http\RedirectResponse
      */
-    public function store(StoreMessageRequest $request)
-    {
-        // Get the authenticated user
-        $user = Auth::user();
-        
-        // Determine the conversation
-        if ($request->has('conversation_id')) {
-            // Use existing conversation
-            $conversation = Conversation::findOrFail($request->conversation_id);
-            
-            // Verify the user is part of this conversation
-            if ($conversation->user_one_id != $user->id && $conversation->user_two_id != $user->id) {
-                return redirect()->route('chat.index')->with('error', 'Unauthorized access.');
-            }
-        } else {
-            // Create conversation with specified user
-            $otherUser = User::findOrFail($request->user_id);
-            $conversation = $user->getConversationWith($otherUser->id);
+    public function store(StoreMessageRequest $request): JsonResponse
+{
+    $user = Auth::user();
+
+    // Determine the conversation
+    if ($request->has('conversation_id')) {
+        $conversation = Conversation::findOrFail($request->conversation_id);
+
+        // Verify the user is part of this conversation
+        if ($conversation->user_one_id != $user->id && $conversation->user_two_id != $user->id) {
+            return response()->json(['error' => 'Unauthorized access.'], 403);
         }
-        
-        // Create the new message
-        $message = Message::create([
-            'conversation_id' => $conversation->id,
-            'sender_id' => $user->id,
-            'message' => $request->message,
-            'is_read' => false,
-        ]);
-        
-        // Update the conversation's last_message_at timestamp
-        $conversation->update(['last_message_at' => now()]);
-        
-        return redirect()->route('chat.show', $conversation->getOtherUser($user->id)->id)
-            ->with('success', 'Message sent successfully!');
+    } else {
+        $otherUser = User::findOrFail($request->user_id);
+        $conversation = $user->getConversationWith($otherUser->id);
     }
+
+    // Create the new message
+    $message = Message::create([
+        'conversation_id' => $conversation->id,
+        'sender_id' => $user->id,
+        'message' => $request->message, // 👈 Note: your field is 'message', not 'body'
+        'is_read' => false,
+    ]);
+
+    // Update conversation timestamp
+    $conversation->update(['last_message_at' => now()]);
+
+    // 🔥 Broadcast the event
+    broadcast(new MessageSent($message));
+
+    // Return JSON response for React
+    return response()->json([
+        'message' => [
+            'id' => $message->id,
+            'body' => $message->message, // 👈 map 'message' → 'body' for frontend consistency
+            'sender_id' => $message->sender_id,
+            'sender_name' => $user->name,
+            'created_at' => $message->created_at->toIso8601String(),
+        ],
+    ], 201);
+}
 
     /**
      * Mark all messages in a conversation as read.
