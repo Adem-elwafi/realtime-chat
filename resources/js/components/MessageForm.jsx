@@ -11,38 +11,44 @@ export default function MessageForm({ conversationId }) {
     const [body, setBody] = useState('');
     const [loading, setLoading] = useState(false);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!body.trim()) return;
+const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!body.trim()) return;
 
-        setLoading(true);
+    setLoading(true);
 
-        try {
-            const response = await fetch(`/chat/message`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                },
-                body: JSON.stringify({
-                    conversation_id: conversationId,
-                    message: body, // ← matches your StoreMessageRequest
-                }),
-            });
+    try {
+        const response = await fetch(`/chat/message`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+            },
+            body: JSON.stringify({
+                conversation_id: conversationId,
+                message: body,
+            }),
+        });
 
-            if (response.ok) {
-                setBody(''); // Clear input
-            } else {
-                const error = await response.json();
-                alert(error.error || 'Failed to send message');
+        if (response.ok) {
+            const data = await response.json();
+            setBody('');
+            // Optimistically add the message locally to avoid waiting for Echo
+            if (data?.message) {
+                window.dispatchEvent(new CustomEvent('message:sent', { detail: data.message }));
             }
-        } catch (err) {
-            console.error(err);
-            alert('Network error. Is Reverb running?');
-        } finally {
-            setLoading(false);
+        } else {
+            const error = await response.json();
+            alert(error.message || 'Failed to send message');
         }
-    };
+    } catch (err) {
+        console.error(err);
+        alert('Network error');
+    } finally {
+        setLoading(false);
+    }
+};
 
     return (
         <form onSubmit={handleSubmit} className="p-4 border-t">

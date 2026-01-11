@@ -7,6 +7,7 @@ use App\Models\Message;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use App\Http\Requests\StoreMessageRequest;
 use App\Events\MessageSent;
@@ -24,7 +25,7 @@ class ChatController extends Controller
      * @return \Illuminate\View\View
      */
     public function index()
-    {
+    {   
         // Get the authenticated user
         $user = Auth::user();
         
@@ -96,7 +97,8 @@ public function show($userId)
      * @return \Illuminate\Http\RedirectResponse
      */
     public function store(StoreMessageRequest $request): JsonResponse
-{
+{    
+
     $user = Auth::user();
 
     // Determine the conversation
@@ -125,6 +127,11 @@ public function show($userId)
 
     // 🔥 Broadcast the event
     broadcast(new MessageSent($message));
+    Log::info('💾 Message saved and broadcast', [
+        'message_id' => $message->id,
+        'conversation_id' => $conversation->id,
+        'sender_id' => $user->id,
+    ]);
 
     // Return JSON response for React
     return response()->json([

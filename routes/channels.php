@@ -1,19 +1,39 @@
 <?php
 
-use App\Models\Conversation;
-use Illuminate\Support\Facades\Broadcast;
+use Illuminate\Support\Facades\Log;
 
 Broadcast::channel('chat.{conversationId}', function ($user, $conversationId) {
-    // Find the conversation by ID
-    $conversation = Conversation::find($conversationId);
+    Log::info('🔐 Attempting to authorize user for chat channel', [
+        'user_id' => $user->id,
+        'user_id_type' => gettype($user->id),
+        'conversation_id' => $conversationId,
+        'conversation_id_type' => gettype($conversationId),
+    ]);
 
-    // If conversation doesn't exist, deny access
+    $conversation = \App\Models\Conversation::find($conversationId);
+
     if (! $conversation) {
+        Log::warning('❌ Conversation not found', ['id' => $conversationId]);
         return false;
     }
 
-    // Check if the current user is one of the participants
-    // We assume your Conversation model has a relationship like:
-    //   public function participants() { return $this->belongsToMany(User::class); }
-    return $conversation->participants->contains($user);
+    Log::info('✅ Conversation found', [
+        'id' => $conversation->id,
+        'user_one_id' => $conversation->user_one_id,
+        'user_two_id' => $conversation->user_two_id,
+    ]);
+
+    $isParticipant = (
+        $conversation->user_one_id == $user->id ||
+        $conversation->user_two_id == $user->id
+    );
+
+    Log::info('✅ User access result', [
+        'user_id' => $user->id,
+        'allowed' => $isParticipant,
+        'user_one' => $conversation->user_one_id,
+        'user_two' => $conversation->user_two_id,
+    ]);
+
+    return $isParticipant;
 });
