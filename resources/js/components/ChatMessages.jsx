@@ -10,6 +10,7 @@ import echo from '../echo';
  * - initialMessages: Array of messages loaded from Blade
  * - currentUserId: ID of logged-in user
  */
+
 export default function ChatMessages({ conversationId, initialMessages, currentUserId }) {
     const [messages, setMessages] = useState(initialMessages);
     const messagesEndRef = useRef(null);
@@ -39,7 +40,7 @@ export default function ChatMessages({ conversationId, initialMessages, currentU
                 <div
                     key={msg.id}
                     className={`max-w-xs p-3 rounded-lg ${
-                        msg.sender_id === currentUsageId
+                        msg.sender_id === currentUserId
                             ? 'bg-blue-500 text-white ml-auto'
                             : 'bg-gray-200 text-gray-800 mr-auto'
                     }`}
@@ -53,4 +54,5 @@ export default function ChatMessages({ conversationId, initialMessages, currentU
             <div ref={messagesEndRef} />
         </div>
     );
+    
 }

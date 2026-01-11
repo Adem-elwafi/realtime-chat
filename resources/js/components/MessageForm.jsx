@@ -18,7 +18,7 @@ export default function MessageForm({ conversationId }) {
         setLoading(true);
 
         try {
-            const response = await fetch(`/messages`, {
+            const response = await fetch(`/chat/message`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
