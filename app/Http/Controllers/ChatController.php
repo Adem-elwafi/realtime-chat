@@ -122,15 +122,28 @@ public function show($userId)
         'is_read' => false,
     ]);
 
+    Log::info('💾 Message saved to database', [
+        'message_id' => $message->id,
+        'conversation_id' => $conversation->id,
+        'sender_id' => $user->id,
+        'message_preview' => substr($message->message, 0, 50),
+    ]);
+
     // Update conversation timestamp
     $conversation->update(['last_message_at' => now()]);
 
     // 🔥 Broadcast the event
-    broadcast(new MessageSent($message));
-    Log::info('💾 Message saved and broadcast', [
+    Log::info('🚀 About to broadcast MessageSent event', [
         'message_id' => $message->id,
         'conversation_id' => $conversation->id,
-        'sender_id' => $user->id,
+        'channel_will_be' => 'chat.' . $conversation->id,
+    ]);
+    
+    broadcast(new MessageSent($message));
+    
+    Log::info('✅ Broadcast completed', [
+        'message_id' => $message->id,
+        'timestamp' => now()->toIso8601String(),
     ]);
 
     // Return JSON response for React

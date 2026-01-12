@@ -1,6 +1,5 @@
 // resources/js/components/ChatMessages.jsx
 import { useEffect, useState, useRef } from 'react';
-import echo from '../echo';
 
 /**
  * Displays chat messages and listens for real-time updates.
@@ -29,18 +28,72 @@ export default function ChatMessages({ conversationId, initialMessages, currentU
 
     // Listen for new messages via WebSocket
     useEffect(() => {
-        console.log('🔌 Listening on private channel:', `chat.${conversationId}`);
-        const channel = echo.private(`chat.${conversationId}`);
+        console.log('🔌 ChatMessages component mounted');
+        console.log('📋 Conversation ID:', conversationId);
+        console.log('👤 Current User ID:', currentUserId);
+        console.log('📨 Initial Messages Count:', initialMessages.length);
 
-        // Log connection state
-        if (window.Echo) {
-            console.log('✅ Echo instance available');
-            console.log('🌐 Broadcaster:', window.Echo.options.broadcaster);
+        if (!window.Echo) {
+            console.error('❌ Echo instance not available!');
+            return;
         }
 
+        console.log('✅ Echo instance available');
+        
+        if (window.Echo) {
+            console.log('🌐 Echo Configuration:', {
+                broadcaster: window.Echo.options.broadcaster,
+                wsHost: window.Echo.options.wsHost,
+                wsPort: window.Echo.options.wsPort,
+                key: window.Echo.options.key,
+                forceTLS: window.Echo.options.forceTLS,
+            });
+            console.log('🔗 WebSocket URL:', `${window.Echo.options.forceTLS ? 'wss' : 'ws'}://${window.Echo.options.wsHost}:${window.Echo.options.wsPort}`);
+        }
+
+        const channelName = `chat.${conversationId}`;
+        console.log('🔌 Attempting to subscribe to private channel:', channelName);
+        
+        const channel = window.Echo.private(channelName);
+        
+        console.log('📞 Channel object created:', channel);
+        console.log('📞 Channel name:', channel.name);
+
+        channel.subscribed(() => {
+            console.log('✔️ ✔️ ✔️ SUCCESSFULLY SUBSCRIBED TO CHANNEL:', channelName);
+            console.log('⏰ Subscription timestamp:', new Date().toISOString());
+        });
+
+        channel.error((error) => {
+            console.error('❌ ❌ ❌ CHANNEL SUBSCRIPTION ERROR:', error);
+            console.error('❌ Error type:', typeof error);
+            console.error('❌ Error details:', JSON.stringify(error, null, 2));
+        });
+        
+        // Add timeout to detect if subscription never completes
+        setTimeout(() => {
+            console.warn('⚠️ ⚠️ ⚠️ SUBSCRIPTION TIMEOUT - Still waiting after 5 seconds!');
+            console.warn('⚠️ This means the WebSocket connection is not being established');
+            console.warn('⚠️ Check: 1) Reverb is running, 2) Port 8081 is open, 3) Auth endpoint works');
+        }, 5000);
+
         channel.listen('MessageSent', (eventData) => {
-            console.log('📩 New message received:', eventData);
+            console.log('📩 NEW MESSAGE RECEIVED via WebSocket');
+            console.log('📊 Event data:', eventData);
             console.log('📊 Event data keys:', Object.keys(eventData));
+            console.log('💬 Message ID:', eventData.id);
+            console.log('💬 Message body:', eventData.body);
+            console.log('💬 Sender ID:', eventData.sender_id);
+            console.log('💬 Sender name:', eventData.sender_name);
+            console.log('⏰ Received at:', new Date().toISOString());
+            
+            if (!eventData.id) {
+                console.error('⚠️ WARNING: Received message without ID');
+            }
+            if (!eventData.body) {
+                console.error('⚠️ WARNING: Received message without body');
+            }
+            
             addMessage(eventData);
         });
 
@@ -51,18 +104,10 @@ export default function ChatMessages({ conversationId, initialMessages, currentU
         };
         window.addEventListener('message:sent', localHandler);
 
-        channel.subscribed(() => {
-            console.log('✔️ Successfully subscribed to channel');
-        });
-
-        channel.error((error) => {
-            console.error('❌ Channel subscription error:', error);
-        });
-
         // Clean up on unmount
         return () => {
-            console.log('🔌 Leaving channel:', `chat.${conversationId}`);
-            echo.leave(`chat.${conversationId}`);
+            console.log('🔌 Component unmounting - leaving channel:', channelName);
+            window.Echo.leave(channelName);
             window.removeEventListener('message:sent', localHandler);
         };
     }, [conversationId]);

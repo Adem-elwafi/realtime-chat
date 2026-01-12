@@ -45,6 +45,44 @@ Route::middleware(['auth'])->group(function () {
     // User discovery routes
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::get('/users/search', [UserController::class, 'search'])->name('users.search');
+    
+    // Debug routes - for testing broadcast functionality
+    Route::get('/debug/broadcast', function () {
+        $conversations = auth()->user()->conversations;
+        return view('debug.broadcast-test', compact('conversations'));
+    })->name('debug.broadcast');
+    
+    Route::post('/debug/test-broadcast/{conversationId}', function ($conversationId) {
+        $conversation = \App\Models\Conversation::findOrFail($conversationId);
+        
+        // Verify user has access
+        if ($conversation->user_one_id != auth()->id() && $conversation->user_two_id != auth()->id()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+        
+        // Create a test message
+        $message = \App\Models\Message::create([
+            'conversation_id' => $conversation->id,
+            'sender_id' => auth()->id(),
+            'message' => '🧪 TEST MESSAGE - ' . now()->format('H:i:s'),
+            'is_read' => false,
+        ]);
+        
+        // Broadcast it
+        \Illuminate\Support\Facades\Log::info('🧪 Debug: Broadcasting test message', [
+            'message_id' => $message->id,
+            'conversation_id' => $conversation->id,
+        ]);
+        
+        broadcast(new \App\Events\MessageSent($message));
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Test broadcast sent successfully',
+            'message_id' => $message->id,
+            'channel' => 'chat.' . $conversation->id,
+        ]);
+    })->name('debug.test-broadcast');
 });
 
 // Include authentication routes from Breeze
