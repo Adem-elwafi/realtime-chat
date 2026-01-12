@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\ChatTypingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -23,7 +24,12 @@ Route::get('/', function () {
     return redirect()->route('login');
 })->name('home');
 
+Route::post('/chat/typing', [ChatController::class, 'sendTypingIndicator']);
+Route::post('/chat/typing', [ChatTypingController::class, 'store'])
+    ->middleware('auth');
+
 // Dashboard route (redirect to chat)
+
 Route::get('/dashboard', function () {
     return redirect()->route('chat.index');
 })->middleware(['auth'])->name('dashboard');

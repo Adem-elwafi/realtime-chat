@@ -129,6 +129,9 @@
                 menu.classList.add('hidden');
             }
         });
+            window.Laravel = {
+        userId: {{ auth()->check() ? auth()->id() : 'null' }}
+    };
     </script>
 </body>
 </html>

@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Validator;
 use App\Http\Requests\StoreMessageRequest;
 use App\Events\MessageSent;
 use Illuminate\Http\JsonResponse;
+use App\Events\UserTyping;
 
 class ChatController extends Controller
 {
@@ -189,5 +190,23 @@ public function show($userId)
             ]);
         
         return redirect()->back()->with('success', 'Messages marked as read.');
+    }
+
+    public function sendTypingIndicator(Request $request)
+    {
+        $request->validate([
+            'conversation_id' => 'required|exists:conversations,id',
+        ]);
+
+        // Ensure user is part of this conversation (authorization)
+        $conversation = \App\Models\Conversation::findOrFail($request->conversation_id);
+        if (! $conversation->participants()->where('user_id', auth()->id())->exists()) {
+            abort(403, 'Unauthorized');
+        }
+
+        // Broadcast typing event
+        broadcast(new UserTyping($request->conversation_id));
+
+        return response()->json(['success' => true]);
     }
 }
