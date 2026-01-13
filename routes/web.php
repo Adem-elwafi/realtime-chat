@@ -46,12 +46,13 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/chat/message', [ChatController::class, 'store'])->name('chat.store');
     
     // Mark conversation as read
-    Route::post('/chat/{conversationId}/read', [ChatController::class, 'markAsRead'])->name('chat.markAsRead');
+    Route::post('/chat/{conversation}/read', [ChatController::class, 'markMessagesAsRead'])->name('chat.markAsRead');
     
     // User discovery routes
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::get('/users/search', [UserController::class, 'search'])->name('users.search');
-    
+    //message as read route 
+    Route::post('/chat/{conversation}/read', [ChatController::class, 'markMessagesAsRead'])->name('chat.read');
     // Debug routes - for testing broadcast functionality
     Route::get('/debug/broadcast', function () {
         $conversations = auth()->user()->conversations;

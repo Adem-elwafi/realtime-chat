@@ -1,5 +1,6 @@
 // resources/js/components/ChatMessages.jsx
 import { useEffect, useState, useRef } from 'react';
+import axios from 'axios'; // ✅ Added
 
 export default function ChatMessages({
     conversationId,
@@ -7,12 +8,9 @@ export default function ChatMessages({
     currentUserId
 }) {
     const [messages, setMessages] = useState(initialMessages);
-
-    // typing indicator state
     const [isTyping, setIsTyping] = useState(false);
     const [typingUser, setTypingUser] = useState(null);
     const typingHideTimeoutRef = useRef(null);
-
     const messagesEndRef = useRef(null);
 
     const addMessage = (incoming) => {
@@ -22,11 +20,31 @@ export default function ChatMessages({
         });
     };
 
-    // auto scroll
+    // Auto-scroll to bottom
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isTyping]);
 
+    // Mark messages as read when conversation opens
+    const markMessagesAsRead = async () => {
+        console.log('📖 Marking messages as read for conversation:', conversationId);
+        try {
+            const response = await axios.post(`/chat/${conversationId}/read`);
+            const { message_ids } = response.data;
+
+            console.log('✅ Messages marked as read:', message_ids);
+
+            setMessages(prevMessages =>
+                prevMessages.map(msg =>
+                    message_ids.includes(msg.id) ? { ...msg, is_read: true } : msg
+                )
+            );
+        } catch (error) {
+            console.error('❌ Failed to mark messages as read:', error);
+        }
+    }; // ✅ Closed properly
+
+    // Echo listeners
     useEffect(() => {
         if (!window.Echo) {
             console.error('❌ Echo not available');
@@ -36,77 +54,97 @@ export default function ChatMessages({
         const channelName = `chat.${conversationId}`;
         const channel = window.Echo.private(channelName);
 
-        /* -------------------------------
-         | Message received
-         -------------------------------- */
+        // New message
         channel.listen('MessageSent', (eventData) => {
             addMessage(eventData);
         });
 
-        /* -------------------------------
-         | Typing indicator
-         -------------------------------- */
+        // Typing indicator
         channel.listen('.UserTyping', (e) => {
-            // Ignore self
-            if (e.user_id === currentUserId) return;
+            if (!e || !e.user || e.user.id === currentUserId) return;
 
-            // Show typing
-            setTypingUser(e.user_name);
+            setTypingUser(e.user.name);
             setIsTyping(true);
 
-            // 🔥 IMPORTANT: clear old timeout
             if (typingHideTimeoutRef.current) {
                 clearTimeout(typingHideTimeoutRef.current);
             }
 
-            // 🔥 Set a NEW timeout every time an event arrives
             typingHideTimeoutRef.current = setTimeout(() => {
                 setIsTyping(false);
                 setTypingUser(null);
                 typingHideTimeoutRef.current = null;
             }, 3000);
         });
-        /* -------------------------------
-         | Local optimistic messages
-         -------------------------------- */
-        const localHandler = (evt) => {
-            if (!evt.detail) return;
-            addMessage(evt.detail);
+
+        // Read receipts
+        const handleReadReceipt = (e) => {
+            setMessages(prevMessages =>
+                prevMessages.map(msg =>
+                    e.messageIds.includes(msg.id) ? { ...msg, is_read: true } : msg
+                )
+            );
         };
 
+        channel.listen('MessageRead', handleReadReceipt);
+
+        // Local optimistic messages
+        const localHandler = (evt) => {
+            if (evt.detail) addMessage(evt.detail);
+        };
         window.addEventListener('message:sent', localHandler);
 
+        // Cleanup
         return () => {
             window.Echo.leave(channelName);
             window.removeEventListener('message:sent', localHandler);
-
+            channel.stopListening('MessageRead', handleReadReceipt);
             if (typingHideTimeoutRef.current) {
                 clearTimeout(typingHideTimeoutRef.current);
             }
         };
     }, [conversationId, currentUserId]);
 
+    // Trigger read on mount
+    useEffect(() => {
+        markMessagesAsRead();
+    }, [conversationId]);
+
     return (
         <div className="flex flex-col h-full">
             <div className="flex-1 overflow-y-auto p-4 space-y-3 max-h-[500px]">
-                {messages.map((msg) => (
-                    <div
-                        key={msg.id}
-                        className={`max-w-xs p-3 rounded-lg ${
-                            msg.sender_id === currentUserId
-                                ? 'bg-blue-500 text-white ml-auto'
-                                : 'bg-gray-200 text-gray-800 mr-auto'
-                        }`}
-                    >
-                        <p>{msg.body}</p>
-                        <small className="opacity-75 text-xs">
-                            {new Date(msg.created_at).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                            })}
-                        </small>
-                    </div>
-                ))}
+                {messages.map((msg) => {
+                    const isOwn = msg.sender_id === currentUserId;
+                    return (
+                        <div
+                            key={msg.id}
+                            className={`max-w-xs p-3 rounded-lg relative ${
+                                isOwn
+                                    ? 'bg-blue-500 text-white ml-auto'
+                                    : 'bg-gray-200 text-gray-800 mr-auto'
+                            }`}
+                        >
+                            <p>{msg.body}</p>
+                            <small className="opacity-75 text-xs block mt-1">
+                                {new Date(msg.created_at).toLocaleTimeString([], {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                })}
+                            </small>
+
+                            {/* ✅ Read receipt checkmarks */}
+                            {isOwn && (
+                                <span className="absolute -bottom-5 right-0 text-xs">
+                                    {msg.is_read ? (
+                                        <span title="Read" className="text-blue-300">✓✓</span>
+                                    ) : (
+                                        <span title="Sent" className="text-gray-300">✓</span>
+                                    )}
+                                </span>
+                            )}
+                        </div>
+                    );
+                })}
 
                 {isTyping && (
                     <div className="text-sm text-gray-500 italic">

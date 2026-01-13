@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Conversation;
 use App\Models\Message;
+use App\Events\messageRead;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -80,6 +81,7 @@ public function show($userId)
             'body' => $msg->message, // ← your DB column is 'message'
             'sender_id' => $msg->sender_id,
             'sender_name' => optional($msg->sender)->name ?? 'Unknown',
+            'is_read' => (bool) $msg->is_read,
             'created_at' => $msg->created_at->toIso8601String(),
         ];
     })->values();
@@ -154,6 +156,7 @@ public function show($userId)
             'body' => $message->message, // 👈 map 'message' → 'body' for frontend consistency
             'sender_id' => $message->sender_id,
             'sender_name' => $user->name,
+            'is_read' => false, // New messages are unread
             'created_at' => $message->created_at->toIso8601String(),
         ],
     ], 201);
@@ -168,28 +171,45 @@ public function show($userId)
      * @param int $conversationId The ID of the conversation
      * @return \Illuminate\Http\RedirectResponse
      */
-    public function markAsRead($conversationId)
-    {
-        $user = Auth::user();
+        public function markMessagesAsRead(\App\Models\Conversation $conversation)
+        {
+        $userId = auth()->id();
         
-        // Find the conversation and verify user access
-        $conversation = Conversation::where('id', $conversationId)
-            ->where(function ($query) use ($user) {
-                $query->where('user_one_id', $user->id)
-                      ->orWhere('user_two_id', $user->id);
-            })
-            ->firstOrFail();
+        \Log::info('📖 markMessagesAsRead called', [
+            'conversation_id' => $conversation->id,
+            'user_id' => $userId,
+        ]);
         
-        // Mark all messages from the other user as read
-        Message::where('conversation_id', $conversation->id)
-            ->where('sender_id', '!=', $user->id)
-            ->where('is_read', false)
-            ->update([
-                'is_read' => true,
-                'read_at' => now()
+        // Check if user is participant (user_one or user_two)
+        if ($conversation->user_one_id !== $userId && $conversation->user_two_id !== $userId) {
+            \Log::warning('❌ Unauthorized access attempt', [
+                'conversation_id' => $conversation->id,
+                'user_id' => $userId,
             ]);
-        
-        return redirect()->back()->with('success', 'Messages marked as read.');
+            abort(403, 'Unauthorized access to this conversation');
+        }
+
+        $unreadMessages = Message::where('conversation_id', $conversation->id)
+            ->where('sender_id', '!=', $userId)
+            ->where('is_read', false)
+            ->get();
+
+        \Log::info('📊 Unread messages found', [
+            'count' => $unreadMessages->count(),
+            'message_ids' => $unreadMessages->pluck('id')->toArray(),
+        ]);
+
+        if ($unreadMessages->isEmpty()) {
+            return response()->json(['message_ids' => []]);
+        }
+
+        $messageIds = $unreadMessages->pluck('id')->toArray();
+        Message::whereIn('id', $messageIds)->update([
+            'is_read' => true,
+            'read_at' => now(),
+        ]);
+
+        \Log::info('✅ Messages marked as read', ['message_ids' => $messageIds]);
     }
 
     public function sendTypingIndicator(Request $request)
@@ -200,7 +220,9 @@ public function show($userId)
 
         // Ensure user is part of this conversation (authorization)
         $conversation = \App\Models\Conversation::findOrFail($request->conversation_id);
-        if (! $conversation->participants()->where('user_id', auth()->id())->exists()) {
+        $userId = auth()->id();
+        
+        if ($conversation->user_one_id !== $userId && $conversation->user_two_id !== $userId) {
             abort(403, 'Unauthorized');
         }
 
