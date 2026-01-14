@@ -3,16 +3,58 @@ import { useEffect, useState, useRef } from 'react';
 import axios from 'axios'; // ✅ Added
 
 export default function ChatMessages({
-    conversationId,
-    initialMessages,
-    currentUserId
-}) {
+        conversationId,
+        initialMessages,
+        currentUserId
+    }) {
     const [messages, setMessages] = useState(initialMessages);
     const [isTyping, setIsTyping] = useState(false);
     const [typingUser, setTypingUser] = useState(null);
     const typingHideTimeoutRef = useRef(null);
     const messagesEndRef = useRef(null);
 
+    // NEW: Smart timestamp formatter
+const formatMessageTime = (timestamp) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+
+    // Safety check for invalid or future dates
+    if (isNaN(date.getTime()) || date > now) {
+        return 'Invalid date';
+    }
+
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    // Same day → relative time
+    if (diffDays === 0) {
+        if (diffMins < 1) return 'Just now';           // up to ~59 seconds
+        if (diffMins < 60) return `${diffMins}m ago`;
+        return `${diffHours}h ago`;
+    }
+
+    // Yesterday
+    if (diffDays === 1) {
+        return `Yesterday ${date.toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true  // ← makes it 3:45 PM instead of 15:45 (change to false for 24h)
+        })}`;
+    }
+
+    // Older messages
+    return date.toLocaleDateString([], {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric'
+    }) + ' ' + date.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+    });
+};
     const addMessage = (incoming) => {
         setMessages((prev) => {
             if (prev.some((m) => m.id === incoming.id)) return prev;
@@ -126,12 +168,8 @@ export default function ChatMessages({
                         >
                             <p>{msg.body}</p>
                             <small className="opacity-75 text-xs block mt-1">
-                                {new Date(msg.created_at).toLocaleTimeString([], {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                })}
+                                {formatMessageTime(msg.created_at)}
                             </small>
-
                             {/* ✅ Read receipt checkmarks */}
                             {isOwn && (
                                 <span className="absolute -bottom-5 right-0 text-xs">
