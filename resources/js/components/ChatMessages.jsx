@@ -70,11 +70,13 @@ const formatMessageTime = (timestamp) => {
     // Mark messages as read when conversation opens
     const markMessagesAsRead = async () => {
         console.log('📖 Marking messages as read for conversation:', conversationId);
+        console.log('👤 Current user ID:', currentUserId);
         try {
             const response = await axios.post(`/chat/${conversationId}/read`);
             const { message_ids } = response.data;
 
-            console.log('✅ Messages marked as read:', message_ids);
+            console.log('✅ Messages marked as read on backend:', message_ids);
+            console.log('📡 Backend should now broadcast MessageRead event to other users');
 
             setMessages(prevMessages =>
                 prevMessages.map(msg =>
@@ -96,9 +98,24 @@ const formatMessageTime = (timestamp) => {
         const channelName = `chat.${conversationId}`;
         const channel = window.Echo.private(channelName);
 
+        console.log('🔌 Subscribing to channel:', channelName);
+        console.log('🎯 Current user ID:', currentUserId);
+
+        // Debug: Log ALL events on this channel
+        channel.listenToAll((eventName, data) => {
+            console.log('🌟 RAW EVENT RECEIVED:', eventName, data);
+        });
+
         // New message
         channel.listen('MessageSent', (eventData) => {
+            console.log('📨 MessageSent received:', eventData);
             addMessage(eventData);
+            
+            // Auto-mark as read if this message is from the other person
+            if (eventData.sender_id !== currentUserId) {
+                console.log('📖 Auto-marking new message as read (sender is other user)');
+                setTimeout(() => markMessagesAsRead(), 100);
+            }
         });
 
         // Typing indicator
@@ -119,16 +136,25 @@ const formatMessageTime = (timestamp) => {
             }, 3000);
         });
 
-        // Read receipts
+        // Read receipts - Note: Laravel adds a dot prefix for custom events
         const handleReadReceipt = (e) => {
-            setMessages(prevMessages =>
-                prevMessages.map(msg =>
+            console.log('📩 MessageRead event received:', {
+                messageIds: e.messageIds,
+                conversationId: e.conversationId,
+                currentUserId: currentUserId
+            });
+            
+            setMessages(prevMessages => {
+                const updated = prevMessages.map(msg =>
                     e.messageIds.includes(msg.id) ? { ...msg, is_read: true } : msg
-                )
-            );
+                );
+                console.log('✅ Messages state updated after MessageRead');
+                return updated;
+            });
         };
 
-        channel.listen('MessageRead', handleReadReceipt);
+        console.log('🎧 Listening for MessageRead on channel:', channelName);
+        channel.listen('.MessageRead', handleReadReceipt);
 
         // Local optimistic messages
         const localHandler = (evt) => {
@@ -140,7 +166,7 @@ const formatMessageTime = (timestamp) => {
         return () => {
             window.Echo.leave(channelName);
             window.removeEventListener('message:sent', localHandler);
-            channel.stopListening('MessageRead', handleReadReceipt);
+            channel.stopListening('.MessageRead', handleReadReceipt);
             if (typingHideTimeoutRef.current) {
                 clearTimeout(typingHideTimeoutRef.current);
             }
@@ -152,6 +178,11 @@ const formatMessageTime = (timestamp) => {
         markMessagesAsRead();
     }, [conversationId]);
 
+    // Compute the last message sent by the current user
+    const lastOwnMessageId = [...messages]
+        .reverse()
+        .find(m => m.sender_id === currentUserId)?.id;
+
     return (
         <div className="flex flex-col h-full">
             <div className="flex-1 overflow-y-auto p-4 space-y-3 max-h-[500px]">
@@ -160,25 +191,31 @@ const formatMessageTime = (timestamp) => {
                     return (
                         <div
                             key={msg.id}
-                            className={`max-w-xs p-3 rounded-lg relative ${
-                                isOwn
-                                    ? 'bg-blue-500 text-white ml-auto'
-                                    : 'bg-gray-200 text-gray-800 mr-auto'
-                            }`}
+                            className={`max-w-xs ${isOwn ? 'ml-auto' : 'mr-auto'} flex flex-col`}
                         >
-                            <p>{msg.body}</p>
-                            <small className="opacity-75 text-xs block mt-1">
-                                {formatMessageTime(msg.created_at)}
-                            </small>
-                            {/* ✅ Read receipt checkmarks */}
-                            {isOwn && (
-                                <span className="absolute -bottom-5 right-0 text-xs">
-                                    {msg.is_read ? (
-                                        <span title="Read" className="text-blue-300">✓✓</span>
-                                    ) : (
-                                        <span title="Sent" className="text-gray-300">✓</span>
-                                    )}
-                                </span>
+                            <div
+                                className={`p-3 rounded-lg ${
+                                    isOwn
+                                        ? 'bg-blue-500 text-white'
+                                        : 'bg-gray-200 text-gray-800'
+                                }`}
+                            >
+                                <p>{msg.body}</p>
+                                <small className="opacity-75 text-xs block mt-1">
+                                    {formatMessageTime(msg.created_at)}
+                                </small>
+                            </div>
+
+                            {/* ✅ Read receipt checkmarks: only show for last own message, placed below bubble with spacing */}
+                            {isOwn && msg.id === lastOwnMessageId && (
+                                <div className="mt-1 flex items-center justify-end gap-1 text-[11px]">
+                                    <span
+                                        title={msg.is_read ? 'Read' : 'Sent'}
+                                        className={msg.is_read ? 'text-blue-400' : 'text-gray-400'}
+                                    >
+                                        {msg.is_read ? '✓✓' : '✓'}
+                                    </span>
+                                </div>
                             )}
                         </div>
                     );

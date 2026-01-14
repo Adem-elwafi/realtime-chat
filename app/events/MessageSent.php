@@ -72,6 +72,7 @@ class MessageSent implements ShouldBroadcastNow
             'body' => $this->message->message, // ← was 'body', now 'message'
             'sender_id' => $this->message->sender_id,
             'sender_name' => optional($this->message->sender)->name ?? 'Unknown',
+            'is_read' => (bool) $this->message->is_read,
             'created_at' => $this->message->created_at->toIso8601String(),
         ];
         Log::info('📤 Broadcasting data', $data);

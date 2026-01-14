@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 
 class Message extends Model
 {
@@ -70,22 +71,20 @@ class Message extends Model
      *
      * @return bool True if the save operation was successful
      */
+
     public function markAsRead(): bool
     {
-        $this->is_read = true;
-        $this->read_at = now();
-        return $this->save();
+        if (! $this->is_read) {
+            return $this->update([
+                'is_read' => true,
+                'read_at' => now(),
+            ]);
+        }
+        return true;
     }
 
-    /**
-     * Scope to get only unread messages.
-     *
-     * This query scope filters messages where is_read is false.
-     *
-     * @param Builder $query
-     * @return Builder
-     */
-    public function scopeUnread(Builder $query): Builder
+    // Optional: scope for unread
+    public function scopeUnread($query)
     {
         return $query->where('is_read', false);
     }

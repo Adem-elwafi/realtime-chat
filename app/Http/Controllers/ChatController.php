@@ -210,6 +210,19 @@ public function show($userId)
         ]);
 
         \Log::info('✅ Messages marked as read', ['message_ids' => $messageIds]);
+
+        // Broadcast the read receipt event in real-time
+        \Log::info('📡 Broadcasting MessageRead event', [
+            'message_ids' => $messageIds,
+            'conversation_id' => $conversation->id,
+            'channel' => 'chat.' . $conversation->id
+        ]);
+        
+        broadcast(new \App\Events\MessageRead($messageIds, $conversation->id));
+        
+        \Log::info('✅ Broadcast sent');
+
+        return response()->json(['message_ids' => $messageIds]);
     }
 
     public function sendTypingIndicator(Request $request)
