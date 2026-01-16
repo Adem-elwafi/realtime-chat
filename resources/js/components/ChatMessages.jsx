@@ -1,4 +1,5 @@
 // resources/js/components/ChatMessages.jsx
+import React from 'react';
 import { useEffect, useState, useRef } from 'react';
 import axios from 'axios'; // ✅ Added
 
@@ -55,6 +56,34 @@ const formatMessageTime = (timestamp) => {
         hour12: true
     });
 };
+
+    const formatDateHeader = (timestamp) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+
+    // Reset times to compare only dates
+    const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (dateOnly.getTime() === today.getTime()) {
+        return 'Today';
+    }
+
+    if (dateOnly.getTime() === yesterday.getTime()) {
+        return 'Yesterday';
+    }
+
+    // Older dates - full format (you can customize this)
+    return date.toLocaleDateString([], {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+};
+
     const addMessage = (incoming) => {
         setMessages((prev) => {
             if (prev.some((m) => m.id === incoming.id)) return prev;
@@ -186,41 +215,67 @@ const formatMessageTime = (timestamp) => {
     return (
         <div className="flex flex-col h-full">
             <div className="flex-1 overflow-y-auto p-4 space-y-3 max-h-[500px]">
-                {messages.map((msg) => {
-                    const isOwn = msg.sender_id === currentUserId;
-                    return (
-                        <div
-                            key={msg.id}
-                            className={`max-w-xs ${isOwn ? 'ml-auto' : 'mr-auto'} flex flex-col`}
-                        >
-                            <div
-                                className={`p-3 rounded-lg ${
-                                    isOwn
-                                        ? 'bg-blue-500 text-white'
-                                        : 'bg-gray-200 text-gray-800'
-                                }`}
-                            >
-                                <p>{msg.body}</p>
-                                <small className="opacity-75 text-xs block mt-1">
-                                    {formatMessageTime(msg.created_at)}
-                                </small>
-                            </div>
+                {messages.length > 0 && (
+            <>
+        {/* First message always gets a date header */}
+        <div className="flex items-center my-6">
+            <div className="flex-1 h-px bg-gray-300 dark:bg-gray-600"></div>
+            <span className="mx-4 text-xs font-medium text-gray-500 dark:text-gray-400">
+                {formatDateHeader(messages[0].created_at)}
+            </span>
+            <div className="flex-1 h-px bg-gray-300 dark:bg-gray-600"></div>
+        </div>
 
-                            {/* ✅ Read receipt checkmarks: only show for last own message, placed below bubble with spacing */}
-                            {isOwn && msg.id === lastOwnMessageId && (
-                                <div className="mt-1 flex items-center justify-end gap-1 text-[11px]">
-                                    <span
-                                        title={msg.is_read ? 'Read' : 'Sent'}
-                                        className={msg.is_read ? 'text-blue-400' : 'text-gray-400'}
-                                    >
-                                        {msg.is_read ? '✓✓' : '✓'}
-                                    </span>
-                                </div>
-                            )}
+        {messages.map((msg, index) => {
+            const isOwn = msg.sender_id === currentUserId;
+            const showDivider = index > 0 && 
+                formatDateHeader(msg.created_at) !== formatDateHeader(messages[index - 1].created_at);
+
+            return (
+                <React.Fragment key={msg.id}>
+                    {showDivider && (
+                        <div className="flex items-center my-6">
+                            <div className="flex-1 h-px bg-gray-300 dark:bg-gray-600"></div>
+                            <span className="mx-4 text-xs font-medium text-gray-500 dark:text-gray-400">
+                                {formatDateHeader(msg.created_at)}
+                            </span>
+                            <div className="flex-1 h-px bg-gray-300 dark:bg-gray-600"></div>
                         </div>
-                    );
-                })}
+                    )}
 
+                    <div
+                        className={`max-w-xs ${isOwn ? 'ml-auto' : 'mr-auto'} flex flex-col`}
+                    >
+                        <div
+                            className={`p-3 rounded-lg ${
+                                isOwn
+                                    ? 'bg-blue-500 text-white'
+                                    : 'bg-gray-200 text-gray-800'
+                            }`}
+                        >
+                            <p>{msg.body}</p>
+                            <small className="opacity-75 text-xs block mt-1">
+                                {formatMessageTime(msg.created_at)}
+                            </small>
+                        </div>
+
+                        {/* Read receipt checkmarks */}
+                        {isOwn && msg.id === lastOwnMessageId && (
+                            <div className="mt-1 flex items-center justify-end gap-1 text-[11px]">
+                                <span
+                                    title={msg.is_read ? 'Read' : 'Sent'}
+                                    className={msg.is_read ? 'text-blue-400' : 'text-gray-400'}
+                                >
+                                    {msg.is_read ? '✓✓' : '✓'}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                </React.Fragment>
+            );
+        })}
+    </>
+)}
                 {isTyping && (
                     <div className="text-sm text-gray-500 italic">
                         {typingUser || 'Someone'} is typing…
