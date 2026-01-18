@@ -37,3 +37,10 @@ Broadcast::channel('chat.{conversationId}', function ($user, $conversationId) {
 
     return $isParticipant;
 });
+// Global presence channel for tracking online users
+Broadcast::channel('presence-online-users', function ($user) {
+    return [
+        'id'   => $user->id,
+        'name' => $user->name,
+    ];
+});

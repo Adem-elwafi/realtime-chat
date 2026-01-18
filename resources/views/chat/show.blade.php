@@ -7,6 +7,7 @@
             data-conversation-id="{{ $conversation->id }}"
             data-initial-messages="{{ json_encode($messagesForReact) }}"
             data-current-user-id="{{ auth()->id() }}"
+            data-other-user-id="{{ $otherUser->id }}"               
             class="border rounded-lg shadow"
         ></div>
         {{-- Script is loaded from the layout; avoid duplicate includes --}}

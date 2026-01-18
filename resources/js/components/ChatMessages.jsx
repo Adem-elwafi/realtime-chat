@@ -6,13 +6,18 @@ import axios from 'axios'; // ✅ Added
 export default function ChatMessages({
         conversationId,
         initialMessages,
-        currentUserId
+        currentUserId,
+        otherUserId
     }) {
     const [messages, setMessages] = useState(initialMessages);
     const [isTyping, setIsTyping] = useState(false);
     const [typingUser, setTypingUser] = useState(null);
     const typingHideTimeoutRef = useRef(null);
     const messagesEndRef = useRef(null);
+    // NEW: Online presence states
+    const [otherUserOnline, setOtherUserOnline] = useState(false);
+    const [otherUserLastSeen, setOtherUserLastSeen] = useState(null);
+
 
     // NEW: Smart timestamp formatter
 const formatMessageTime = (timestamp) => {
@@ -126,7 +131,34 @@ const formatMessageTime = (timestamp) => {
 
         const channelName = `chat.${conversationId}`;
         const channel = window.Echo.private(channelName);
+        // NEW: Global presence channel for online status
+        const presenceChannel = window.Echo.join('presence-online-users');
 
+        // Get all currently online users (called once on join)
+        presenceChannel.here((users) => {
+            console.log('Currently online users:', users);
+            // Check if the other user is in the list
+            const isOtherOnline = users.some(u => u.id !== currentUserId);
+            setOtherUserOnline(isOtherOnline);
+        });
+
+        // When someone joins (including the other user)
+        presenceChannel.joining((user) => {
+            console.log('User joined:', user);
+            if (user.id !== currentUserId) {
+                setOtherUserOnline(true);
+                setOtherUserLastSeen(null); // Reset last seen when they come online
+            }
+        });
+
+        // When someone leaves
+        presenceChannel.leaving((user) => {
+            console.log('User left:', user);
+            if (user.id !== currentUserId) {
+                setOtherUserOnline(false);
+                setOtherUserLastSeen(new Date()); // Mark approximate disconnect time
+            }
+        });
         console.log('🔌 Subscribing to channel:', channelName);
         console.log('🎯 Current user ID:', currentUserId);
 
@@ -194,6 +226,7 @@ const formatMessageTime = (timestamp) => {
         // Cleanup
         return () => {
             window.Echo.leave(channelName);
+            window.Echo.leave('presence-online-users'); // NEW: leave presence channel
             window.removeEventListener('message:sent', localHandler);
             channel.stopListening('.MessageRead', handleReadReceipt);
             if (typingHideTimeoutRef.current) {
@@ -214,6 +247,29 @@ const formatMessageTime = (timestamp) => {
 
     return (
         <div className="flex flex-col h-full">
+        {/* NEW: Online status header */}
+        <div className="p-4 border-b bg-gray-50 dark:bg-gray-800">
+            <div className="flex items-center gap-3">
+                <div className="relative">
+                    <div className={`w-3 h-3 rounded-full ${
+                        otherUserOnline ? 'bg-green-900' : 'bg-gray-400'
+                    }`}></div>
+                    {otherUserOnline && (
+                        <div className="absolute inset-0 rounded-full animate-ping bg-green-400 opacity-75"></div>
+                    )}
+                </div>
+                <div>
+                    <p className="font-medium">Chat with [Other User]</p> {/* You can fetch name later */}
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {otherUserOnline 
+                            ? 'Active now' 
+                            : otherUserLastSeen 
+                                ? `Last seen ${formatMessageTime(otherUserLastSeen)}` 
+                                : 'Offline'}
+                    </p>
+                </div>
+            </div>
+        </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-3 max-h-[500px]">
                 {messages.length > 0 && (
             <>
