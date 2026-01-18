@@ -56,6 +56,7 @@ export default function MessageForm({ conversationId }) {
 const handleChange = (e) => {
     const value = e.target.value;
     setBody(value);
+    autoGrowTextarea();
 
     if (!value.trim()) return;
 
@@ -81,6 +82,29 @@ const handleChange = (e) => {
         lastTypingRef.current = 0;
     }, 1000);
 };
+
+    // Auto-grow textarea to fit content
+    const autoGrowTextarea = () => {
+        const textarea = textareaRef.current;
+        if (textarea) {
+            textarea.style.height = 'auto';
+            const newHeight = Math.min(textarea.scrollHeight, 200); // Max height: 200px
+            textarea.style.height = newHeight + 'px';
+        }
+    };
+
+    // Handle keyboard shortcuts
+    const handleKeyDown = (e) => {
+        // Enter without Shift = Send
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            if (body.trim() && !loading) {
+                handleSubmit(e);
+            }
+            return;
+        }
+        // Shift+Enter = New line (default behavior, don't prevent)
+    };
 
     const handleEmojiClick = (emojiObject) => {
         const emoji = emojiObject.emoji;
@@ -148,13 +172,13 @@ const handleChange = (e) => {
     
 
     return (
-        <form onSubmit={handleSubmit} className="p-4 border-t">
-            <div className="flex gap-2 relative">
+        <form onSubmit={handleSubmit} className="bg-gray-300 p-4">
+            <div className="flex gap-2 items-center relative">
                 {/* Emoji Picker Button */}
                 <button
                     type="button"
                     onClick={() => setShowPicker(!showPicker)}
-                    className="text-2xl hover:bg-gray-100 rounded px-2 transition-colors"
+                    className="text-2xl hover:bg-gray-200 rounded px-2 transition-colors flex-shrink-0"
                     disabled={loading}
                     title="Add emoji"
                 >
@@ -172,21 +196,24 @@ const handleChange = (e) => {
                     </div>
                 )}
 
-                <textarea
+                <input 
                     ref={textareaRef}
+                    type="text"
                     value={body}
                     onChange={handleChange}
-                    placeholder="Type a message..."
-                    className="flex-1 border rounded p-2 resize-none"
-                    rows="1"
+                    onKeyDown={handleKeyDown}
                     disabled={loading}
+                    placeholder="Type your message…"
+                    className="flex items-center h-10 flex-1 rounded px-3 text-sm"
                 />
+
                 <button
                     type="submit"
                     disabled={!body.trim() || loading}
-                    className="bg-blue-500 text-white px-4 py-2 rounded disabled:opacity-50"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+                    title={loading ? 'Sending...' : 'Send (Enter)'}
                 >
-                    {loading ? 'Sending...' : 'Send'}
+                    {loading ? '...' : '➤'}
                 </button>
             </div>
         </form>

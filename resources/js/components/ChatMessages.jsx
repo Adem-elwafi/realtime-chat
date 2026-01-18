@@ -212,9 +212,11 @@ const formatMessageTime = (timestamp) => {
 
         // Typing indicator
         channel.listen('.UserTyping', (e) => {
-            if (!e || !e.user || e.user.id === currentUserId) return;
+            console.log('📝 UserTyping event received:', e);
+            
+            if (!e || e.user_id === currentUserId) return;
 
-            setTypingUser(e.user.name);
+            setTypingUser(e.user_name);
             setIsTyping(true);
 
             if (typingHideTimeoutRef.current) {
@@ -369,10 +371,10 @@ const formatMessageTime = (timestamp) => {
                                 <button
                                     onClick={() => deleteMessage(msg.id)}
                                     disabled={deletingIds.has(msg.id)}
-                                    className="absolute -top-8 right-0 opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white rounded px-2 py-1 text-xs"
+                                    className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white px-1.5 py-0.5 text-xs"
                                     title="Delete message"
                                 >
-                                    {deletingIds.has(msg.id) ? '⏳' : '🗑️'}
+                                    {deletingIds.has(msg.id) ? '⏳' : '✕'}
                                 </button>
                             )}
                         </div>
