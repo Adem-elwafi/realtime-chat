@@ -1,15 +1,36 @@
 // resources/js/components/MessageForm.jsx
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import EmojiPicker from 'emoji-picker-react';
 
 export default function MessageForm({ conversationId }) {
     const [body, setBody] = useState('');
     const [loading, setLoading] = useState(false);
+    const [showPicker, setShowPicker] = useState(false);
 
     const lastTypingSentRef = useRef(0);
     const typingTimeoutRef = useRef(null);
     const lastTypingRef = useRef(0);
     const stopTypingTimeout = useRef(null);
+    const pickerRef = useRef(null);
+    const textareaRef = useRef(null);
+
+    // Close picker when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (pickerRef.current && !pickerRef.current.contains(event.target)) {
+                setShowPicker(false);
+            }
+        };
+
+        if (showPicker) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showPicker]);
 
     const sendTypingIndicator = async () => {
         try {
@@ -60,6 +81,24 @@ const handleChange = (e) => {
         lastTypingRef.current = 0;
     }, 1000);
 };
+
+    const handleEmojiClick = (emojiObject) => {
+        const emoji = emojiObject.emoji;
+        const textarea = textareaRef.current;
+        const cursorPosition = textarea.selectionStart;
+        const newBody = body.slice(0, cursorPosition) + emoji + body.slice(cursorPosition);
+        
+        setBody(newBody);
+        setShowPicker(false);
+        
+        // Focus back to textarea and set cursor after emoji
+        setTimeout(() => {
+            textarea.focus();
+            const newCursorPosition = cursorPosition + emoji.length;
+            textarea.setSelectionRange(newCursorPosition, newCursorPosition);
+        }, 0);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!body.trim()) return;
@@ -110,8 +149,31 @@ const handleChange = (e) => {
 
     return (
         <form onSubmit={handleSubmit} className="p-4 border-t">
-            <div className="flex gap-2">
+            <div className="flex gap-2 relative">
+                {/* Emoji Picker Button */}
+                <button
+                    type="button"
+                    onClick={() => setShowPicker(!showPicker)}
+                    className="text-2xl hover:bg-gray-100 rounded px-2 transition-colors"
+                    disabled={loading}
+                    title="Add emoji"
+                >
+                    😊
+                </button>
+
+                {/* Emoji Picker */}
+                {showPicker && (
+                    <div ref={pickerRef} className="absolute bottom-full left-0 mb-2 z-50">
+                        <EmojiPicker
+                            onEmojiClick={handleEmojiClick}
+                            width={350}
+                            height={400}
+                        />
+                    </div>
+                )}
+
                 <textarea
+                    ref={textareaRef}
                     value={body}
                     onChange={handleChange}
                     placeholder="Type a message..."
