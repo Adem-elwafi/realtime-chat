@@ -45,6 +45,9 @@ Route::middleware(['auth'])->group(function () {
     // Send new message
     Route::post('/chat/message', [ChatController::class, 'store'])->name('chat.store');
     
+    // Delete a message
+    Route::delete('/chat/message/{messageId}', [ChatController::class, 'destroy'])->name('chat.destroy');
+    
     // Mark conversation as read
     Route::post('/chat/{conversation}/read', [ChatController::class, 'markMessagesAsRead'])->name('chat.markAsRead');
     

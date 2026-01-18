@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use App\Http\Requests\StoreMessageRequest;
 use App\Events\MessageSent;
+use App\Events\MessageDeleted;
 use Illuminate\Http\JsonResponse;
 use App\Events\UserTyping;
 
@@ -243,5 +244,59 @@ public function show($userId)
         broadcast(new UserTyping($request->conversation_id));
 
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Delete a message.
+     *
+     * This method allows a user to delete their own message.
+     * It verifies ownership and broadcasts the deletion event.
+     *
+     * @param int $messageId The ID of the message to delete
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function destroy($messageId): JsonResponse
+    {
+        $userId = auth()->id();
+        $message = Message::findOrFail($messageId);
+
+        // Verify the user owns this message
+        if ($message->sender_id !== $userId) {
+            return response()->json(['error' => 'Unauthorized. You can only delete your own messages.'], 403);
+        }
+
+        $conversationId = $message->conversation_id;
+
+        Log::info('🗑️ Deleting message', [
+            'message_id' => $message->id,
+            'conversation_id' => $conversationId,
+            'user_id' => $userId,
+        ]);
+
+        // Delete the message
+        $message->delete();
+
+        Log::info('✅ Message deleted successfully', [
+            'message_id' => $messageId,
+        ]);
+
+        // 🔥 Broadcast the deletion event
+        Log::info('📡 Broadcasting MessageDeleted event', [
+            'message_id' => $messageId,
+            'conversation_id' => $conversationId,
+            'channel' => 'chat.' . $conversationId,
+        ]);
+
+        broadcast(new MessageDeleted($messageId, $conversationId, $userId));
+
+        Log::info('✅ MessageDeleted broadcast completed', [
+            'message_id' => $messageId,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message_id' => $messageId,
+            'conversation_id' => $conversationId,
+        ], 200);
     }
 }

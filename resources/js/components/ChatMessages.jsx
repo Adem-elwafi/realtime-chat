@@ -12,6 +12,7 @@ export default function ChatMessages({
     const [messages, setMessages] = useState(initialMessages);
     const [isTyping, setIsTyping] = useState(false);
     const [typingUser, setTypingUser] = useState(null);
+    const [deletingIds, setDeletingIds] = useState(new Set()); // Track deletions in progress
     const typingHideTimeoutRef = useRef(null);
     const messagesEndRef = useRef(null);
     // NEW: Online presence states
@@ -94,6 +95,36 @@ const formatMessageTime = (timestamp) => {
             if (prev.some((m) => m.id === incoming.id)) return prev;
             return [...prev, incoming];
         });
+    };
+
+    // Handle message deletion
+    const deleteMessage = async (messageId) => {
+        // Confirm deletion
+        if (!window.confirm('Delete this message?')) {
+            return;
+        }
+
+        setDeletingIds(prev => new Set(prev).add(messageId));
+
+        try {
+            const response = await axios.delete(`/chat/message/${messageId}`);
+            
+            if (response.data.success) {
+                console.log('🗑️ Message deleted successfully:', messageId);
+                
+                // Optimistic UI removal
+                setMessages(prev => prev.filter(m => m.id !== messageId));
+            }
+        } catch (error) {
+            console.error('❌ Failed to delete message:', error);
+            alert('Failed to delete message. Please try again.');
+        } finally {
+            setDeletingIds(prev => {
+                const next = new Set(prev);
+                next.delete(messageId);
+                return next;
+            });
+        }
     };
 
     // Auto-scroll to bottom
@@ -217,6 +248,24 @@ const formatMessageTime = (timestamp) => {
         console.log('🎧 Listening for MessageRead on channel:', channelName);
         channel.listen('.MessageRead', handleReadReceipt);
 
+        // Message deletion
+        const handleDeleteReceipt = (e) => {
+            console.log('🗑️ MessageDeleted event received:', {
+                messageId: e.messageId,
+                conversationId: e.conversationId,
+                deletedBy: e.deletedBy
+            });
+            
+            setMessages(prevMessages => {
+                const updated = prevMessages.filter(msg => msg.id !== e.messageId);
+                console.log('✅ Message removed from state after deletion');
+                return updated;
+            });
+        };
+
+        console.log('🎧 Listening for MessageDeleted on channel:', channelName);
+        channel.listen('.MessageDeleted', handleDeleteReceipt);
+
         // Local optimistic messages
         const localHandler = (evt) => {
             if (evt.detail) addMessage(evt.detail);
@@ -229,6 +278,7 @@ const formatMessageTime = (timestamp) => {
             window.Echo.leave('presence-online-users'); // NEW: leave presence channel
             window.removeEventListener('message:sent', localHandler);
             channel.stopListening('.MessageRead', handleReadReceipt);
+            channel.stopListening('.MessageDeleted', handleDeleteReceipt);
             if (typingHideTimeoutRef.current) {
                 clearTimeout(typingHideTimeoutRef.current);
             }
@@ -303,7 +353,7 @@ const formatMessageTime = (timestamp) => {
                         className={`max-w-xs ${isOwn ? 'ml-auto' : 'mr-auto'} flex flex-col`}
                     >
                         <div
-                            className={`p-3 rounded-lg ${
+                            className={`p-3 rounded-lg relative group ${
                                 isOwn
                                     ? 'bg-blue-500 text-white'
                                     : 'bg-gray-200 text-gray-800'
@@ -313,6 +363,18 @@ const formatMessageTime = (timestamp) => {
                             <small className="opacity-75 text-xs block mt-1">
                                 {formatMessageTime(msg.created_at)}
                             </small>
+
+                            {/* Delete button - only for own messages */}
+                            {isOwn && (
+                                <button
+                                    onClick={() => deleteMessage(msg.id)}
+                                    disabled={deletingIds.has(msg.id)}
+                                    className="absolute -top-8 right-0 opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white rounded px-2 py-1 text-xs"
+                                    title="Delete message"
+                                >
+                                    {deletingIds.has(msg.id) ? '⏳' : '🗑️'}
+                                </button>
+                            )}
                         </div>
 
                         {/* Read receipt checkmarks */}
