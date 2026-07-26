@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Collection;
 use App\Models\Conversation;
 use App\Models\Message;
+use App\Models\Friendship;
 use Illuminate\Support\Facades\DB;
 
 class User extends Authenticatable
@@ -134,5 +135,41 @@ class User extends Authenticatable
             'user_one_id' => $userOneId,
             'user_two_id' => $userTwoId,
         ]);
+    }
+
+    public function friendRequestsSent(): HasMany
+    {
+        return $this->hasMany(Friendship::class, 'requester_id');
+    }
+
+    public function friendRequestsReceived(): HasMany
+    {
+        return $this->hasMany(Friendship::class, 'addressee_id');
+    }
+
+    public function getFriendsAttribute(): Collection
+    {
+        $sentAccepted = Friendship::where('requester_id', $this->id)
+            ->where('status', 'accepted')
+            ->pluck('addressee_id');
+
+        $receivedAccepted = Friendship::where('addressee_id', $this->id)
+            ->where('status', 'accepted')
+            ->pluck('requester_id');
+
+        $friendIds = $sentAccepted->merge($receivedAccepted)->unique();
+
+        return User::whereIn('id', $friendIds)->get();
+    }
+
+    public function areFriends(User $other): bool
+    {
+        return Friendship::where(function ($q) use ($other) {
+                $q->where('requester_id', $this->id)->where('addressee_id', $other->id);
+            })->orWhere(function ($q) use ($other) {
+                $q->where('requester_id', $other->id)->where('addressee_id', $this->id);
+            })
+            ->where('status', 'accepted')
+            ->exists();
     }
 }

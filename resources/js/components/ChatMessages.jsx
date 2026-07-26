@@ -199,7 +199,7 @@ const formatMessageTime = (timestamp) => {
         });
 
         // New message
-        channel.listen('MessageSent', (eventData) => {
+        channel.listen('.MessageSent', (eventData) => {
             console.log('📨 MessageSent received:', eventData);
             addMessage(eventData);
             

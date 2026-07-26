@@ -58,6 +58,11 @@ class MessageSent implements ShouldBroadcastNow
         return new PrivateChannel($channel);
     }
 
+    public function broadcastAs()
+    {
+        return 'MessageSent';
+    }
+
     /**
      * Get the data to broadcast to clients.
      *

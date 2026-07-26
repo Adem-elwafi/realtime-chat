@@ -34,6 +34,7 @@ const echo = new Echo({
     wsPort: port,
     wssPort: port,
     forceTLS: useTLS,
+    withCredentials: true,
     enabledTransports: ['ws', 'wss'],
     authEndpoint: '/broadcasting/auth',
     auth: {
