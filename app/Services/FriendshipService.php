@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Friendship;
+use App\Models\User;
 use App\Events\FriendshipUpdated;
 use App\Enums\FriendshipStatus;
 
@@ -26,5 +27,37 @@ class FriendshipService
     public function loadRelation(Friendship $friendship): Friendship
     {
         return $friendship->load(['requester:id,name,email,is_online,last_seen', 'addressee:id,name,email,is_online,last_seen']);
+    }
+
+    public function pendingRequests(User $user): array
+    {
+        $incoming = $user->friendRequestsReceived()
+            ->with('requester:id,name,email,is_online,last_seen')
+            ->where('status', FriendshipStatus::Pending)
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn (Friendship $friendship) => [
+                'id' => $friendship->id,
+                'created_at' => $friendship->created_at?->toIso8601String(),
+                'user' => $friendship->requester,
+            ])
+            ->values();
+
+        $outgoing = $user->friendRequestsSent()
+            ->with('addressee:id,name,email,is_online,last_seen')
+            ->where('status', FriendshipStatus::Pending)
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn (Friendship $friendship) => [
+                'id' => $friendship->id,
+                'created_at' => $friendship->created_at?->toIso8601String(),
+                'user' => $friendship->addressee,
+            ])
+            ->values();
+
+        return [
+            'incoming' => $incoming,
+            'outgoing' => $outgoing,
+        ];
     }
 }

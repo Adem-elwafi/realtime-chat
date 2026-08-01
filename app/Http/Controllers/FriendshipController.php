@@ -122,6 +122,11 @@ class FriendshipController extends Controller
         return response()->json($this->friendshipService->loadRelation($friendship));
     }
 
+    public function pending(Request $request): JsonResponse
+    {
+        return response()->json($this->friendshipService->pendingRequests($request->user()));
+    }
+
     public function index(Request $request): JsonResponse
     {
         $userId = auth()->id();
