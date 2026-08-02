@@ -1,5 +1,6 @@
 // resources/js/app.jsx
 import './bootstrap'; // ← Initialize axios and Echo FIRST
+import './auth-forms';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import ChatMessages from './components/ChatMessages';   // ✅ relative path

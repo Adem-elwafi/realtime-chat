@@ -1,12 +1,15 @@
 <x-guest-layout>
-    <form method="POST" action="{{ route('register') }}">
+    <form method="POST" action="{{ route('register') }}" data-fresh-csrf>
         @csrf
+
+        <div data-form-alert class="hidden mb-4 text-sm text-red-600"></div>
 
         <!-- Name -->
         <div>
             <x-input-label for="name" :value="__('Name')" />
             <x-text-input id="name" class="block mt-1 w-full" type="text" name="name" :value="old('name')" required autofocus autocomplete="name" />
             <x-input-error :messages="$errors->get('name')" class="mt-2" />
+            <ul data-input-error-for="name" class="mt-2 text-sm text-red-600 space-y-1"></ul>
         </div>
 
         <!-- Email Address -->
@@ -14,6 +17,7 @@
             <x-input-label for="email" :value="__('Email')" />
             <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required autocomplete="username" />
             <x-input-error :messages="$errors->get('email')" class="mt-2" />
+            <ul data-input-error-for="email" class="mt-2 text-sm text-red-600 space-y-1"></ul>
         </div>
 
         <!-- Password -->
@@ -26,6 +30,7 @@
                             required autocomplete="new-password" />
 
             <x-input-error :messages="$errors->get('password')" class="mt-2" />
+            <ul data-input-error-for="password" class="mt-2 text-sm text-red-600 space-y-1"></ul>
         </div>
 
         <!-- Confirm Password -->
@@ -37,6 +42,7 @@
                             name="password_confirmation" required autocomplete="new-password" />
 
             <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
+            <ul data-input-error-for="password_confirmation" class="mt-2 text-sm text-red-600 space-y-1"></ul>
         </div>
 
         <div class="flex items-center justify-end mt-4">

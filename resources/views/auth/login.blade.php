@@ -2,14 +2,17 @@
     <!-- Session Status -->
     <x-auth-session-status class="mb-4" :status="session('status')" />
 
-    <form method="POST" action="{{ route('login') }}">
+    <form method="POST" action="{{ route('login') }}" data-fresh-csrf>
         @csrf
+
+        <div data-form-alert class="hidden mb-4 text-sm text-red-600"></div>
 
         <!-- Email Address -->
         <div>
             <x-input-label for="email" :value="__('Email')" />
             <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required autofocus autocomplete="username" />
             <x-input-error :messages="$errors->get('email')" class="mt-2" />
+            <ul data-input-error-for="email" class="mt-2 text-sm text-red-600 space-y-1"></ul>
         </div>
 
         <!-- Password -->
@@ -22,6 +25,7 @@
                             required autocomplete="current-password" />
 
             <x-input-error :messages="$errors->get('password')" class="mt-2" />
+            <ul data-input-error-for="password" class="mt-2 text-sm text-red-600 space-y-1"></ul>
         </div>
 
         <!-- Remember Me -->
